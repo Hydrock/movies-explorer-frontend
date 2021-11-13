@@ -1,0 +1,25 @@
+.alert {
+  width: 260px;
+  height: 100px;
+  padding: 20px;
+  border-radius: 5px;
+  background-color: #999;
+  color: black;
+  display: flex;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  animation: show 0.5s linear;
+}
+
+@keyframes show {
+  0% {
+    right: -200px;
+  }
+  80% {
+    right: 0px;
+  }
+  100% {
+    right: 20px;
+  }
+}

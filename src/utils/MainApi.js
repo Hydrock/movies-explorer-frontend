@@ -39,16 +39,6 @@ class MainApi {
     }).then(this._handleOriginalResponse);
   }
 
-  getUserProfile(token) {
-    return fetch(`${this._url}/users/me`, {
-      method: "GET",
-      headers: {
-        ...this._headers,
-        Authorization: `Bearer ${token}`,
-      },
-    }).then(this._handleOriginalResponse);
-  }
-
   updateUserProfile(data, token) {
     return fetch(`${this._url}/users/me`, {
       method: "PATCH",

@@ -10,24 +10,38 @@ import Profile from "../Profile/Profile";
 import NotFound from "../NotFound/NotFound";
 import Movies from "../Movies/Movies";
 import SavedMovies from "../SavedMovies/SavedMovies";
+import Alert from '../Alert/Alert';
 
 import mainApi from "../../utils/MainApi";
 import moviesApi from "../../utils/MoviesApi";
 
 function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(!!localStorage.getItem("jwt"));
   const [token, setToken] = useState(false);
   const [currentUser, setCurrentUser] = useState({});
+
+  const [isAlertVisible, setAlertVisability] = useState(false);
+
+  function setAlertVisabilityWrapper(boolVal) {
+    setAlertVisability(boolVal);
+
+    if (boolVal === true) {
+      setTimeout(() => {
+        setAlertVisability(false);
+      }, 3000);
+    }
+  }
 
   /**
    * Все фильмы
    */
   const [movies, setMovies] = useState([]);
-  const [filteredMovies, setFilteredMovies] = useState([]);
-  const [filteredShortMovies, setFilteredShortMovies] = useState([]);
-   /**
-   * Чекбокс короткометражки
-   */
+  const [filteredMovies, setFilteredMovies] = useState(JSON.parse(localStorage.getItem('filteredMovies') || '[]'));
+  const [filteredShortMovies, setFilteredShortMovies] = useState(JSON.parse(localStorage.getItem('filteredShortMovies') || '[]'));
+
+  /**
+  * Чекбокс короткометражки
+  */
   const [shortFilmValue, setShortFilmValue] = useState(false);
 
   const history = useHistory();
@@ -51,19 +65,18 @@ function App() {
       setToken(token);
       mainApi
         .checkToken(token)
-        .then((data) => {
+        .then(({ data }) => {
           if (data) {
             setLoggedIn(true);
+            setCurrentUser(data);
           }
         })
         .catch((err) => {
           console.log(err);
           history.push("/signin");
         });
-        history.push(location.pathname);
     }
-    history.push(location.pathname);
-  }, [loggedIn]);
+  }, []);
 
   /**
    * Сохранение всех фильмов в стейт из локалстореджа
@@ -87,7 +100,10 @@ function App() {
           setSavedFilteredMovies(data);
           setSavedFilteredShortMovies(data);
         })
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          console.log(err);
+          setAlertVisabilityWrapper(true);
+        });
     } else {
       setSavedMovies([]);
       setSavedFilteredMovies([]);
@@ -96,34 +112,22 @@ function App() {
   }, [loggedIn]);
 
   useEffect(() => {
-    if (loggedIn) {
-      const token = localStorage.getItem("jwt");
-      mainApi
-        .getUserProfile(token)
-        .then(({ data }) => {
-          setCurrentUser(data);
-        })
-        .catch((e) => console.log(e));
-    }
-  }, [loggedIn]);
-
-  useEffect(() => {
     const mapped = savedFilteredMovies.map((item) => {
       return {
-      country: item.country,
-      description:  item.description,
-      director: item.director,
-      duration: item.duration,
-      image: {
-        url: item.image,
-      },
-      nameEN: item.nameEN,
-      nameRU: item.nameRU,
-      trailerLink: item.trailer,
-      year: item.year,
-      _id: item._id
-    }
-  })
+        country: item.country,
+        description: item.description,
+        director: item.director,
+        duration: item.duration,
+        image: {
+          url: item.image,
+        },
+        nameEN: item.nameEN,
+        nameRU: item.nameRU,
+        trailerLink: item.trailer,
+        year: item.year,
+        _id: item._id
+      }
+    })
     setMappedSavedFilteredMovies(mapped);
   }, [savedFilteredMovies, movies]);
 
@@ -164,9 +168,9 @@ function App() {
     mainApi
       .login(data)
       .then((res) => {
-        setLoggedIn(true);
         localStorage.setItem("jwt", res.data.token);
         setToken(res.token);
+        setLoggedIn(true);
         history.push("/movies");
       })
       .catch((err) => {
@@ -201,8 +205,18 @@ function App() {
 
     history.push("/");
     setMovies([]);
+
+    /* * */
     setFilteredMovies([]);
+    localStorage.removeItem('filteredMovies');
+    /* * */
+
+
+    /* * */
     setFilteredShortMovies([]);
+    localStorage.removeItem('filteredShortMovies');
+    /* * */
+
     setSavedMovies([]);
     setSavedFilteredMovies([]);
     setSavedFilteredShortMovies([]);
@@ -215,27 +229,35 @@ function App() {
     /**
      * Фильтруем фильмы и сохраняем в стейтах
      */
-     function filterMovies(data, text = '') {
+    function filterMovies(data, text = '') {
       const filteredMovies = filterKeyword(data, text);
 
       if (filteredMovies.length === 0) {
         setIsNotFound(true);
       } else {
         setIsNotFound(false);
-        
+
       }
+
+      /* * */
       setFilteredMovies(filteredMovies);
+      localStorage.setItem('filteredMovies', JSON.stringify(filteredMovies));
+      /* * */
 
       if (shortFilmValue) {
         const filteredMoviesShort = filterShortfilm(filteredMovies);
+        console.log('filteredMoviesShort:', filteredMoviesShort);
 
         if (filteredMoviesShort.length !== 0) {
+          localStorage.setItem('filteredShortMovies', JSON.stringify(filteredMoviesShort));
           setIsNotFound(false);
           setFilteredShortMovies(filteredMoviesShort);
         } else {
+          localStorage.removeItem('filteredShortMovies');
           setFilteredShortMovies(filteredMoviesShort);
         }
       } else {
+        localStorage.removeItem('filteredShortMovies');
         setFilteredShortMovies([]);
       }
     }
@@ -261,11 +283,11 @@ function App() {
           setErrorMessageMovies(true);
           setIsNotFound(false);
         });
-      } else {
-        filterMovies(movies, text);
-      }
+    } else {
+      filterMovies(movies, text);
     }
-  
+  }
+
 
   //счетчик по ключевым словам
   function filterKeyword(films, text = '') {
@@ -354,11 +376,12 @@ function App() {
   return (
     <CurrentUserContext.Provider value={currentUser}>
       <div className="app">
+        <Alert isVisible={ isAlertVisible } />
         <Switch>
           <Route exact path="/">
-            <Main 
+            <Main
               loggedIn={loggedIn}
-             />
+            />
           </Route>
           <ProtectedRoute
             exact
@@ -372,7 +395,7 @@ function App() {
             isLoading={isLoading}
             onSearchMovies={handleSearchMovies}
             isNotFound={isNotFound}
-            setIsNotFound={ setIsNotFound }
+            setIsNotFound={setIsNotFound}
             shortFilmValue={shortFilmValue}
             setShortFilmValue={setShortFilmValue}
             saveMovieAfterLike={saveMovieAfterLike}
@@ -385,7 +408,7 @@ function App() {
             loggedIn={loggedIn}
             component={SavedMovies}
             isNotFound={isNotFound}
-            setIsNotFound={ setIsNotFound }
+            setIsNotFound={setIsNotFound}
             shortFilmValue={shortFilmValue}
             setShortFilmValue={setShortFilmValue}
             errorMessageMovies={errorMessageMovies}
@@ -395,7 +418,7 @@ function App() {
             savedMovies={savedMovies}
             saveMovieAfterLike={saveMovieAfterLike}
             deleteSavedMovies={deleteSavedMovies}
-            setSavedFilteredMovies={ setSavedFilteredMovies }
+            setSavedFilteredMovies={setSavedFilteredMovies}
           />
           <ProtectedRoute
             exact
@@ -408,30 +431,30 @@ function App() {
             setIsSuccess={setIsSuccess}
           />
           <Route exact path="/signin">
-    
-            { !loggedIn ? (
-             
-               <Login
-               onLogin={login}
-               setIsSuccess={setIsSuccess}
-               isSuccess={isSuccess}
-               
-               />
+
+            {!loggedIn ? (
+
+              <Login
+                onLogin={login}
+                setIsSuccess={setIsSuccess}
+                isSuccess={isSuccess}
+
+              />
             ) : (
-        
-              <Redirect to="/movies" /> 
+
+              <Redirect to="/movies" />
             )}
-           
+
           </Route>
           <Route exact path="/signup">
-          { !loggedIn ? (
-            <Register
-              isSuccess={isSuccess}
-              setIsSuccess={setIsSuccess}
-              onRegister={register}
-            />
-               ) : (
-              <Redirect to="/movies" /> 
+            {!loggedIn ? (
+              <Register
+                isSuccess={isSuccess}
+                setIsSuccess={setIsSuccess}
+                onRegister={register}
+              />
+            ) : (
+              <Redirect to="/movies" />
             )}
           </Route>
           <Route path="*">
